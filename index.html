@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Бот планер</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="links.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -171,7 +170,7 @@ const PRODUCTS = {
 };
 
 const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null;
-const invoices = window.INVOICES || {};
+let invoices = {};  // из links.js, грузится в конце
 const $ = id => document.getElementById(id);
 let current = "weekly";
 
@@ -307,6 +306,11 @@ if (tg) {
 } else {
   document.body.classList.add("no-tg");
 }
+// links.js — каждый раз свежий: иначе Telegram минут 10 показывает старые цены и ссылки из кэша
+const links = document.createElement("script");
+links.src = "links.js?" + Date.now();
+links.onload = links.onerror = () => { invoices = window.INVOICES || {}; render(); };
+document.head.append(links);
 render();
 </script>
 </body>
