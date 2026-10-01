@@ -82,6 +82,7 @@ section { margin-top: 36px; }
 .price-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .price { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
 .price small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 6px; }
+.demos { display: flex; gap: 14px; }
 .link { font: inherit; font-weight: 500; color: var(--tone-ink); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .buy { display: none; width: 100%; margin-top: 16px; font: inherit; font-weight: 600; font-size: 17px; padding: 14px; border: 0; border-radius: 10px; background: var(--tone-ink); color: var(--sheet); cursor: pointer; }
 .no-tg .buy { display: block; }
@@ -119,7 +120,7 @@ footer { margin-top: 32px; font-size: 14px; color: var(--muted); }
     <ul id="points"></ul>
     <div class="price-row">
       <div class="price" id="price"></div>
-      <button class="link" id="demo" type="button">Посмотреть демо</button>
+      <span class="demos" id="demos"></span>
     </div>
     <button class="buy" id="buy" type="button"></button>
     <p class="status" id="status" hidden></p>
@@ -148,12 +149,16 @@ footer { margin-top: 32px; font-size: 14px; color: var(--muted); }
 
 <script>
 // ссылки на демо (только просмотр, копирование запрещено); пусто — кнопка скрыта
-const DEMO = { weekly: "", tasks: "", budget: "" };
+const DEMO = {
+  weekly: [["Демо", "https://docs.google.com/spreadsheets/d/1CIZDn-_-VZi7m1n19HoYm_ecMx-4oAv64iW3h4yRkn0/edit?usp=sharing"],
+           ["Тёмная версия", "https://docs.google.com/spreadsheets/d/1Gh1TziLhALw89lCBVbED4ApRbiUXIvwq_mYGbBmABA4/edit?usp=sharing"]],
+  tasks: [], budget: [], set: [],
+};
 
 const PRODUCTS = {
   weekly: {
     tab: "Неделя", tone: "sage", hint: "Попробуй: отметь пару дел — процент пересчитается.",
-    points: ["7 дней с делами и галочками", "Трекер привычек на неделю", "Процент выполнения за день и неделю", "Цель недели и заметки"],
+    points: ["7 дней с галочками, кольца прогресса и графики", "Трекер привычек с сериями 🔥, настроение и энергия", "Версии для компьютера и телефона — связаны между собой", "Светлая и тёмная тема в комплекте"],
   },
   tasks: {
     tab: "Задачи", tone: "lilac", hint: "Нажми на статус — он сменится, как в выпадающем списке.",
@@ -241,7 +246,8 @@ function render() {
   }
   $("points").innerHTML = info.points.map(p => `<li>${p}</li>`).join("");
   $("price").innerHTML = price ? `${price} ⭐<small>разово</small>` : '<small>Оплата скоро появится</small>';
-  $("demo").hidden = !DEMO[current];
+  $("demos").innerHTML = DEMO[current].map(([label, url]) =>
+    `<button class="link" type="button" data-url="${url}">${label}</button>`).join("");
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.p === current));
   $("status").hidden = true;
   const label = `Купить за ${price} ⭐`;
@@ -289,7 +295,10 @@ $("sheet").addEventListener("click", e => {
   chip.closest("div").previousElementSibling.previousElementSibling.classList.toggle("done", s === 2);
   haptic();
 });
-$("demo").addEventListener("click", () => tg ? tg.openLink(DEMO[current]) : window.open(DEMO[current], "_blank"));
+$("demos").addEventListener("click", e => {
+  const url = e.target.closest("button")?.dataset.url;
+  if (url) tg ? tg.openLink(url) : window.open(url, "_blank");
+});
 $("buy").addEventListener("click", buy);
 
 function applyTheme() {
