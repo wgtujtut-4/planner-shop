@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Бот планер</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="links.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F1F3F0; --sheet: #FFFFFF; --ink: #26312D; --muted: #6C7872; --line: #DCE2DD; --head: #F6F8F6;
+  --sage: #B7CDBE; --sage-ink: #3D6A50;
+  --lilac: #D6CEEA; --lilac-ink: #5A4C88;
+  --blush: #F2D8D0; --blush-ink: #994C3C;
+  --tone: var(--sage); --tone-ink: var(--sage-ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161B19; --sheet: #1F2624; --ink: #E5EBE7; --muted: #93A099; --line: #313A36; --head: #252D2A;
+    --sage: #3B5646; --sage-ink: #A8D2B6; --lilac: #463F63; --lilac-ink: #CEC3F2; --blush: #573B34; --blush-ink: #F3BCAD;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #161B19; --sheet: #1F2624; --ink: #E5EBE7; --muted: #93A099; --line: #313A36; --head: #252D2A;
+  --sage: #3B5646; --sage-ink: #A8D2B6; --lilac: #463F63; --lilac-ink: #CEC3F2; --blush: #573B34; --blush-ink: #F3BCAD;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 16px/1.5 "Golos Text", system-ui, sans-serif; font-variant-numeric: tabular-nums;
+}
+main { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+h2 { font-size: 19px; line-height: 1.3; font-weight: 600; margin: 0 0 12px; }
+p { margin: 0; }
+.lead { color: var(--muted); max-width: 34ch; }
+.brand { font-weight: 600; color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+section { margin-top: 36px; }
+
+/* фрагмент таблицы: буквы столбцов, номера строк, клетки */
+.preview { margin-top: 24px; }
+.sheet {
+  background: var(--sheet); border: 1px solid var(--line); border-bottom: 0;
+  border-radius: 10px 10px 0 0; overflow: hidden; font-size: 14px;
+}
+.grid { display: grid; margin-right: -1px; } /* правая граница последнего столбца уходит под рамку */
+.grid > div { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 7px 8px; min-height: 36px; display: flex; align-items: center; gap: 6px; }
+.grid .h, .grid .n { background: var(--head); color: var(--muted); font-size: 12px; justify-content: center; padding: 3px 4px; min-height: 22px; }
+.grid .title { background: var(--tone); color: var(--tone-ink); font-weight: 600; }
+.grid .done { color: var(--muted); text-decoration: line-through; }
+.grid .num { justify-content: flex-end; }
+.grid .over { color: var(--blush-ink); font-weight: 600; }
+
+.box {
+  appearance: none; width: 22px; height: 22px; margin: 0; flex: none; cursor: pointer;
+  border: 1.5px solid var(--muted); border-radius: 5px; background: var(--sheet); display: grid; place-content: center;
+}
+.box:checked { background: var(--tone-ink); border-color: var(--tone-ink); }
+.box:checked::after { content: ""; width: 10px; height: 6px; border: 2px solid var(--sheet); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.bar { flex: 1; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--tone-ink); border-radius: 4px; transition: width .35s ease; }
+.chip { border: 0; font: inherit; font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 99px; cursor: pointer; background: var(--line); color: var(--ink); white-space: nowrap; }
+.chip[data-s="1"] { background: var(--lilac); color: var(--lilac-ink); }
+.chip[data-s="2"] { background: var(--sage); color: var(--sage-ink); }
+.hint { font-size: 13px; color: var(--muted); padding: 8px 2px 0; min-height: 28px; }
+
+/* вкладки листов, как внизу Google Таблиц */
+.tabs { display: flex; gap: 2px; border-top: 1px solid var(--line); }
+.tabs button {
+  flex: 1; font: inherit; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer;
+  background: var(--head); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 8px 8px; padding: 9px 2px 10px;
+}
+.tabs button[aria-selected="true"] { background: var(--sheet); color: var(--tone-ink); font-weight: 600; box-shadow: inset 0 3px 0 var(--tone-ink); }
+
+.info { margin-top: 22px; }
+.info ul { margin: 0 0 16px; padding: 0; list-style: none; }
+.info li { padding: 6px 0 6px 22px; position: relative; }
+.info li::before { content: ""; position: absolute; left: 2px; top: 13px; width: 9px; height: 9px; border-radius: 2px; background: var(--tone); box-shadow: inset 0 0 0 1.5px var(--tone-ink); }
+.price-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.price { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.price small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 6px; }
+.link { font: inherit; font-weight: 500; color: var(--tone-ink); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.buy { display: none; width: 100%; margin-top: 16px; font: inherit; font-weight: 600; font-size: 17px; padding: 14px; border: 0; border-radius: 10px; background: var(--tone-ink); color: var(--sheet); cursor: pointer; }
+.no-tg .buy { display: block; }
+.status { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--tone); color: var(--tone-ink); font-weight: 500; }
+.status[hidden] { display: none; }
+
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 30px 1fr; gap: 10px; padding: 8px 0; }
+ol.steps li::before { content: counter(s); width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-content: center; font-size: 13px; font-weight: 600; }
+details { border-bottom: 1px solid var(--line); padding: 12px 0; }
+details:first-of-type { border-top: 1px solid var(--line); }
+summary { font-weight: 500; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; color: var(--muted); font-size: 20px; line-height: 1; }
+details[open] summary::after { content: "−"; }
+details p { color: var(--muted); padding-top: 8px; }
+footer { margin-top: 32px; font-size: 14px; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--tone-ink); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Бот планер</div>
+  <h1>Планеры в Google Таблицах</h1>
+  <p class="lead">Считают проценты, подсвечивают сроки и сводят бюджет сами. Оплата разовая, таблица остаётся у тебя.</p>
+
+  <div class="preview" id="preview">
+    <div class="sheet" id="sheet"></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <p class="hint" id="hint"></p>
+  </div>
+
+  <div class="info">
+    <ul id="points"></ul>
+    <div class="price-row">
+      <div class="price" id="price"></div>
+      <button class="link" id="demo" type="button">Посмотреть демо</button>
+    </div>
+    <button class="buy" id="buy" type="button"></button>
+    <p class="status" id="status" hidden></p>
+  </div>
+
+  <section>
+    <h2>Как получить</h2>
+    <ol class="steps">
+      <li>Оплати звёздами прямо здесь, в Telegram.</li>
+      <li>Бот сразу пришлёт ссылку в чат.</li>
+      <li>Открой её и нажми «Создать копию» — таблица появится в твоём Google Диске.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Вопросы</h2>
+    <details><summary>Что нужно, чтобы пользоваться?</summary><p>Google-аккаунт и Google Таблицы — они бесплатные. Работают в браузере и в приложении на телефоне.</p></details>
+    <details><summary>Удобно ли на телефоне?</summary><p>Да. Главные вкладки сделаны под узкий экран: крупные галочки, без прокрутки вбок.</p></details>
+    <details><summary>Это подписка?</summary><p>Нет. Платишь один раз, копия таблицы твоя навсегда.</p></details>
+    <details><summary>Потерял ссылку</summary><p>Отправь боту /my — он пришлёт ссылки на всё, что ты купил.</p></details>
+    <details><summary>Что такое звёзды?</summary><p>Валюта Telegram для покупок в ботах. Если звёзд нет, их можно купить прямо в окне оплаты.</p></details>
+  </section>
+
+  <footer>Условия покупки — /terms, помощь с оплатой — /paysupport в чате с ботом.</footer>
+</main>
+
+<script>
+// ссылки на демо (только просмотр, копирование запрещено); пусто — кнопка скрыта
+const DEMO = { weekly: "", tasks: "", budget: "" };
+
+const PRODUCTS = {
+  weekly: {
+    tab: "Неделя", tone: "sage", hint: "Попробуй: отметь пару дел — процент пересчитается.",
+    points: ["7 дней с делами и галочками", "Трекер привычек на неделю", "Процент выполнения за день и неделю", "Цель недели и заметки"],
+  },
+  tasks: {
+    tab: "Задачи", tone: "lilac", hint: "Нажми на статус — он сменится, как в выпадающем списке.",
+    points: ["Приоритет, срок и статус у каждой задачи", "Просроченное подсвечивается само", "Фильтр по статусу", "Счётчики: сколько сделано и сколько осталось"],
+  },
+  budget: {
+    tab: "Бюджет", tone: "blush", hint: "Факт считается из записей о расходах за месяц.",
+    points: ["Доходы и расходы по категориям", "План и факт, остаток на месяц", "Диаграмма расходов", "Сводка за год по месяцам"],
+  },
+  set: {
+    tab: "Набор", tone: "sage", hint: "",
+    points: ["Недельный планер", "Планер задач", "Планер бюджета"],
+  },
+};
+
+const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null;
+const invoices = window.INVOICES || {};
+const $ = id => document.getElementById(id);
+let current = "weekly";
+
+function haptic() { if (tg) tg.HapticFeedback.selectionChanged(); }
+
+function grid(cols, cells) {
+  return `<div class="grid" style="grid-template-columns:${cols}">${cells.join("")}</div>`;
+}
+const head = letters => ['<div class="h"></div>', ...letters.map(l => `<div class="h">${l}</div>`)];
+
+const SHEETS = {
+  weekly() {
+    const todo = [["Йога 20 минут", 1], ["Ответить на письма", 1], ["Купить продукты", 0],
+                  ["Прочитать 10 страниц", 0], ["Позвонить маме", 0], ["Лечь до 23:00", 0]];
+    const cells = [...head(["A", "B"]), '<div class="n">1</div>', '<div class="title" style="grid-column:span 2">Понедельник</div>'];
+    todo.forEach(([t, d], i) => cells.push(`<div class="n">${i + 2}</div>`,
+      `<div><input class="box" type="checkbox" aria-label="${t}" ${d ? "checked" : ""}></div>`, `<div class="task${d ? " done" : ""}">${t}</div>`));
+    cells.push(`<div class="n">${todo.length + 2}</div>`, '<div></div>', '<div><span class="bar"><i id="fill"></i></span><span id="pct"></span></div>');
+    return grid("26px 44px 1fr", cells);
+  },
+  tasks() {
+    const rows = [["Сдать отчёт", "30.09", 1, true], ["Записаться к врачу", "сегодня", 1], ["Оплатить интернет", "08.10", 0], ["Подготовить слайды", "10.10", 2]];
+    const names = ["Не начато", "В работе", "Готово"];
+    const cells = [...head(["A", "B", "C"])];
+    rows.forEach(([t, d, s, over], i) => cells.push(`<div class="n">${i + 1}</div>`, `<div class="${s === 2 ? "done" : ""}">${t}</div>`,
+      `<div class="${over ? "over" : ""}">${d}</div>`, `<div><button class="chip" type="button" data-s="${s}">${names[s]}</button></div>`));
+    return grid("26px 1fr 70px 96px", cells);
+  },
+  budget() {
+    const rows = [["Продукты", "15 000", "11 240", .75], ["Транспорт", "3 000", "2 450", .82], ["Кафе", "4 000", "4 600", 1.15], ["Подписки", "1 500", "990", .66]];
+    const cells = [...head(["A", "B", "C"]), '<div class="n">1</div>', '<div class="title">Категория</div>', '<div class="title num">План</div>', '<div class="title num">Факт</div>'];
+    rows.forEach(([c, p, f, r], i) => cells.push(`<div class="n">${i + 2}</div>`, `<div>${c}</div>`, `<div class="num">${p}</div>`, `<div class="num${r > 1 ? " over" : ""}">${f}</div>`));
+    cells.push('<div class="n">6</div>', '<div>Остаток</div>', '<div style="grid-column:span 2"><span class="bar"><i style="width:81%"></i></span>4 220 ₽</div>');
+    return grid("26px 1fr 72px 72px", cells);
+  },
+  set() {
+    const cells = [...head(["A", "B"])];
+    ["weekly", "tasks", "budget"].forEach((p, i) => {
+      const info = PRODUCTS[p];
+      cells.push(`<div class="n">${i + 1}</div>`, `<div class="title" style="background:var(--${info.tone});color:var(--${info.tone}-ink)">${info.tab}</div>`, `<div>${info.points[0]}</div>`);
+    });
+    return grid("26px 92px 1fr", cells);
+  },
+};
+
+function updateWeek() {
+  const boxes = [...document.querySelectorAll("#sheet .box")];
+  const done = boxes.filter(b => b.checked).length;
+  $("fill").style.width = Math.round(done / boxes.length * 100) + "%";
+  $("pct").textContent = `${done} из ${boxes.length}`;
+}
+
+function stars(p) { return invoices[p] ? invoices[p].stars : null; }
+
+function render() {
+  const info = PRODUCTS[current];
+  const root = document.documentElement.style;
+  root.setProperty("--tone", `var(--${info.tone})`);
+  root.setProperty("--tone-ink", `var(--${info.tone}-ink)`);
+  $("sheet").innerHTML = SHEETS[current]();
+  if (current === "weekly") updateWeek();
+  const price = stars(current);
+  if (current === "set") {
+    const separate = ["weekly", "tasks", "budget"].reduce((s, p) => s + (stars(p) || 0), 0);
+    $("hint").textContent = price && separate > price ? `Вместе выгоднее на ${separate - price} ⭐, чем по отдельности.` : "";
+  } else {
+    $("hint").textContent = info.hint;
+  }
+  $("points").innerHTML = info.points.map(p => `<li>${p}</li>`).join("");
+  $("price").innerHTML = price ? `${price} ⭐<small>разово</small>` : '<small>Оплата скоро появится</small>';
+  $("demo").hidden = !DEMO[current];
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.p === current));
+  $("status").hidden = true;
+  const label = `Купить за ${price} ⭐`;
+  $("buy").textContent = label;
+  $("buy").disabled = !price;
+  if (tg) {
+    if (price) tg.MainButton.setParams({ text: label, is_visible: true, is_active: true });
+    else tg.MainButton.hide();
+  }
+}
+
+function showStatus(text) { $("status").textContent = text; $("status").hidden = false; }
+
+function buy() {
+  const inv = invoices[current];
+  if (!inv) return;
+  if (!tg) { showStatus("Открой магазин внутри Telegram, через бота — оплата работает только там."); return; }
+  tg.openInvoice(inv.link, status => {
+    if (status === "paid") {
+      tg.HapticFeedback.notificationOccurred("success");
+      showStatus("Оплачено. Ссылка уже в чате с ботом.");
+    } else if (status === "failed") {
+      showStatus("Оплата не прошла. Попробуй ещё раз или напиши /paysupport в чате с ботом.");
+    }
+  });
+}
+
+$("tabs").innerHTML = Object.entries(PRODUCTS).map(([p, info]) =>
+  `<button type="button" role="tab" data-p="${p}">${info.tab}</button>`).join("");
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b && b.dataset.p !== current) { current = b.dataset.p; haptic(); render(); }
+});
+$("sheet").addEventListener("change", e => {
+  if (!e.target.matches(".box")) return;
+  e.target.closest("div").nextElementSibling.classList.toggle("done", e.target.checked);
+  haptic(); updateWeek();
+});
+$("sheet").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  const s = (+chip.dataset.s + 1) % 3;
+  chip.dataset.s = s;
+  chip.textContent = ["Не начато", "В работе", "Готово"][s];
+  chip.closest("div").previousElementSibling.previousElementSibling.classList.toggle("done", s === 2);
+  haptic();
+});
+$("demo").addEventListener("click", () => tg ? tg.openLink(DEMO[current]) : window.open(DEMO[current], "_blank"));
+$("buy").addEventListener("click", buy);
+
+function applyTheme() {
+  if (!tg) return;
+  document.documentElement.dataset.theme = tg.colorScheme;
+  const bg = getComputedStyle(document.documentElement).getPropertyValue("--paper").trim();
+  tg.setHeaderColor(bg); tg.setBackgroundColor(bg);
+}
+if (tg) {
+  tg.ready(); tg.expand();
+  applyTheme();
+  tg.onEvent("themeChanged", applyTheme);
+  tg.MainButton.onClick(buy);
+} else {
+  document.body.classList.add("no-tg");
+}
+render();
+</script>
+</body>
+</html>
